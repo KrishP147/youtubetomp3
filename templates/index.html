@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to MP3</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #e8e8e8;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 620px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.2rem;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 160px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            color: #e8e8e8;
+            font-size: 0.875rem;
+            font-family: inherit;
+            padding: 0.875rem;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.15s;
+            line-height: 1.6;
+        }
+
+        textarea:focus { border-color: #ff2222; }
+
+        textarea::placeholder { color: #3a3a3a; }
+
+        .btn {
+            margin-top: 0.75rem;
+            width: 100%;
+            padding: 0.8rem;
+            background: #ff2222;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, opacity 0.15s;
+        }
+
+        .btn:hover:not(:disabled) { background: #cc1111; }
+
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        .loading {
+            display: none;
+            align-items: center;
+            gap: 0.6rem;
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        .spinner {
+            width: 15px;
+            height: 15px;
+            border: 2px solid #333;
+            border-top-color: #ff2222;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .results {
+            margin-top: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .result-item {
+            background: #1a1a1a;
+            border: 1px solid #252525;
+            border-radius: 10px;
+            padding: 0.875rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+        }
+
+        .result-item.success { border-color: #1a3020; }
+        .result-item.error   { border-color: #301a1a; }
+
+        .result-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .result-title {
+            font-size: 0.875rem;
+            color: #e8e8e8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .result-url {
+            font-size: 0.75rem;
+            color: #555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 0.15rem;
+        }
+
+        .error-msg {
+            font-size: 0.8rem;
+            color: #e05555;
+            margin-top: 0.15rem;
+        }
+
+        .download-btn {
+            padding: 0.4rem 0.9rem;
+            background: #1db954;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-decoration: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .download-btn:hover { background: #17a348; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YouTube → MP3</h1>
+        <p class="subtitle">Paste one or more YouTube links, one per line — then hit Convert.</p>
+
+        <textarea
+            id="urlInput"
+            placeholder="https://www.youtube.com/watch?v=&#10;https://www.youtube.com/watch?v=&#10;https://youtu.be/..."
+        ></textarea>
+
+        <button class="btn" id="convertBtn" onclick="convert()">Convert to MP3</button>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <span id="loadingText">Converting...</span>
+        </div>
+
+        <div id="results" class="results"></div>
+    </div>
+
+    <script>
+        async function convert() {
+            const input = document.getElementById('urlInput').value.trim();
+            if (!input) return;
+
+            const urls = input.split('\n').filter(u => u.trim());
+            if (!urls.length) return;
+
+            const btn        = document.getElementById('convertBtn');
+            const loading    = document.getElementById('loading');
+            const loadingTxt = document.getElementById('loadingText');
+            const resultsDiv = document.getElementById('results');
+
+            btn.disabled = true;
+            loading.style.display = 'flex';
+            loadingTxt.textContent = `Converting ${urls.length} video${urls.length > 1 ? 's' : ''}…`;
+            resultsDiv.innerHTML = '';
+
+            try {
+                const res  = await fetch('/convert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ urls: input })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    resultsDiv.innerHTML = errorItem(data.error, '');
+                    return;
+                }
+
+                resultsDiv.innerHTML = data.results.map(r =>
+                    r.status === 'success'
+                        ? `<div class="result-item success">
+                               <div class="result-info">
+                                   <div class="result-title">${esc(r.title)}</div>
+                                   <div class="result-url">${esc(r.url)}</div>
+                               </div>
+                               <a class="download-btn" href="/download/${encodeURIComponent(r.filename)}" download>Download</a>
+                           </div>`
+                        : errorItem(r.error || 'Unknown error', r.url)
+                ).join('');
+
+            } catch (err) {
+                resultsDiv.innerHTML = errorItem(err.message, '');
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function errorItem(msg, url) {
+            return `<div class="result-item error">
+                        <div class="result-info">
+                            ${url ? `<div class="result-url">${esc(url)}</div>` : ''}
+                            <div class="error-msg">${esc(msg)}</div>
+                        </div>
+                    </div>`;
+        }
+
+        function esc(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        document.getElementById('urlInput').addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') convert();
+        });
+    </script>
+</body>
+</html>
