@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube to MP3</title>
+    <title>youtubetomp3+4</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -57,8 +57,27 @@
 
         textarea::placeholder { color: #3a3a3a; }
 
-        .btn {
+        .controls {
             margin-top: 0.75rem;
+            display: flex;
+            gap: 0.6rem;
+        }
+
+        .format-select {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            color: #e8e8e8;
+            font-size: 0.875rem;
+            padding: 0 0.8rem;
+            outline: none;
+            min-width: 140px;
+        }
+
+        .format-select:focus { border-color: #ff2222; }
+
+        .btn {
+            margin-top: 0;
             width: 100%;
             padding: 0.8rem;
             background: #ff2222;
@@ -159,19 +178,36 @@
         }
 
         .download-btn:hover { background: #17a348; }
+
+        @media (max-width: 540px) {
+            .controls {
+                flex-direction: column;
+            }
+
+            .format-select,
+            .btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>YouTube → MP3</h1>
-        <p class="subtitle">Paste one or more YouTube links, one per line — then hit Convert.</p>
+        <h1>YouTube → MP3 + MP4</h1>
+        <p class="subtitle">youtubetomp3+4: paste one or more YouTube links, choose format, then convert.</p>
 
         <textarea
             id="urlInput"
             placeholder="https://www.youtube.com/watch?v=&#10;https://www.youtube.com/watch?v=&#10;https://youtu.be/..."
         ></textarea>
 
-        <button class="btn" id="convertBtn" onclick="convert()">Convert to MP3</button>
+        <div class="controls">
+            <select id="formatSelect" class="format-select" aria-label="Output format">
+                <option value="mp3" selected>MP3 (audio)</option>
+                <option value="mp4">MP4 (video)</option>
+            </select>
+            <button class="btn" id="convertBtn" onclick="convert()">Convert</button>
+        </div>
 
         <div id="loading" class="loading">
             <div class="spinner"></div>
@@ -189,6 +225,8 @@
             const urls = input.split('\n').filter(u => u.trim());
             if (!urls.length) return;
 
+            const format = document.getElementById('formatSelect').value;
+
             const btn        = document.getElementById('convertBtn');
             const loading    = document.getElementById('loading');
             const loadingTxt = document.getElementById('loadingText');
@@ -196,14 +234,14 @@
 
             btn.disabled = true;
             loading.style.display = 'flex';
-            loadingTxt.textContent = `Converting ${urls.length} video${urls.length > 1 ? 's' : ''}…`;
+            loadingTxt.textContent = `Converting ${urls.length} video${urls.length > 1 ? 's' : ''} to ${format.toUpperCase()}...`;
             resultsDiv.innerHTML = '';
 
             try {
                 const res  = await fetch('/convert', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ urls: input })
+                    body: JSON.stringify({ urls: input, format })
                 });
                 const data = await res.json();
 
@@ -219,7 +257,7 @@
                                    <div class="result-title">${esc(r.title)}</div>
                                    <div class="result-url">${esc(r.url)}</div>
                                </div>
-                               <a class="download-btn" href="/download/${encodeURIComponent(r.filename)}" download>Download</a>
+                               <a class="download-btn" href="/download/${encodeURIComponent(r.filename)}" download>Download ${esc(format.toUpperCase())}</a>
                            </div>`
                         : errorItem(r.error || 'Unknown error', r.url)
                 ).join('');
